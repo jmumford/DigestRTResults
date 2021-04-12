@@ -85,12 +85,19 @@ def search_analysis_make_figures(taskname):
               stat_args = {'threshold': 0,
                  'cut_coords': 10,
                  'black_bg': True}  
-              plot_stat_map(thresh_tstat, title="{0} correlated with {1}".format(dependent_variable_name, independent_variable_name), display_mode='z', **stat_args)  
+              plot_stat_map(thresh_tstat, title="{0}:{1} correlated with {2}".format(taskname, dependent_variable_name, independent_variable_name), display_mode='z', **stat_args)  
             else:
                 print('{0} has no significant correlation with {1}'.format(dependent_variable_name, independent_variable_name))
 
 
 # %%
-search_analysis_make_figures('CCTHot')
+task_dirs = glob.glob('/Users/jeanettemumford/sherlock_local/uh2/aim1/BIDS_scans/derivatives/2ndlevel_4_2_21/*/secondlevel-RT-True_beta-False_maps')
+
+for current_task_dir in task_dirs:
+    task_name = current_task_dir.split('/')[-2]
+    print('-'*20)
+    print(task_name)
+    print('-'*20)
+    search_analysis_make_figures(task_name)
 
 # %%
