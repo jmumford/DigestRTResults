@@ -15,16 +15,16 @@
 #     name: python3
 # ---
 
+
 # %%
-#practice with just one design.mat
+# practice with just one design.mat
 import numpy as np
-from nilearn import plotting
-from nilearn.plotting import plot_stat_map, plot_anat
-from nilearn.image import math_img,  largest_connected_component_img
+from nilearn.plotting import plot_stat_map
+from nilearn.image import math_img
 import nibabel as nib
 import json
-import glob
-from scipy.stats import norm
+from pathlib import Path
+
 
 # Function to threshold stat image
 def mask_tstat_img(tstat_path, p_gt0_path, p_lt0_path):
@@ -34,14 +34,28 @@ def mask_tstat_img(tstat_path, p_gt0_path, p_lt0_path):
     p_gt0_path:  Path to 1-p value image for contrast>0
     p_lt0_path:  Path to 1-p value image for contrast<0
     """
-    tstat_img = nib.load(tstat_path)
     p_gt0_img = nib.load(p_gt0_path)
     p_lt0_img = nib.load(p_lt0_path)
-    thresh_tstat_img = math_img('((img1>0.95)+(img2>0.95))*img3',
-    img1=p_gt0_img, img2=p_lt0_img, img3=tstat_img)
+    tstat_img = nib.load(tstat_path)
+    thresh_tstat_img = math_img('((img1 > 0.95) + (img2 > 0.95)) * img3',
+                                img1=p_gt0_img, img2=p_lt0_img, img3=tstat_img)
     return thresh_tstat_img
 
-def search_analysis_make_figures(taskname):
+
+def get_json_contents(json_file):
+    """
+    load contents from the task contrast json
+    """
+
+    with open(json_file) as f:
+        return(json.load(f))
+
+
+def get_contrast_keys_from_json_contents(contrast_names, search_key='RT'):
+    return([key for key, val in contrast_names.items() if search_key in val])
+
+
+def search_analysis_make_figures(taskdir):
     """Function that loops through all analysis directories (randomise) within a task
     and finds contrasts involving RT as a covariate.  If no significant results, message 
     is output to screen.  Otherwise a thresholded t-stat map (p<0.05) is created.
@@ -49,55 +63,60 @@ def search_analysis_make_figures(taskname):
     stopSignal, stroop and twoByTwo
     """
 
-    analysis_dirs = glob.glob('/Users/jeanettemumford/sherlock_local/uh2/aim1/BIDS_scans/derivatives/2ndlevel_4_2_21/{0}/secondlevel-RT-True_beta-False_maps/*Randomise'.format(taskname))
+    taskname = taskdir.parts[-2]
+
+    analysis_dirs = taskdir.glob('*Randomise')
 
     for current_directory in analysis_dirs:
-        f = open(analysis_dirs[0] + '/t_name_map.json')
-        tnames = json.load(f)
-        f.close()
-        search_key = 'RT'
-        res = [key for key, val in tnames.items() if search_key in val]
+        json_file = current_directory / 't_name_map.json'
+        contrast_dict = get_json_contents(json_file)
+        contrast_keys = get_contrast_keys_from_json_contents(contrast_dict)
 
-        # should always be an even number of contrasts
-        if len(res)%2 == 0:
-            num_contrasts = len(res)//2
+        if len(contrast_keys) % 2 == 0:
+            num_tstats = len(contrast_keys) // 2
         else:
             print('skipping {0} since odd number of RT contrasts'.format(current_directory))
             continue
 
-        for connum in range(num_contrasts):
-            cont_ind1 = res[2*connum]
-            cont_ind2 = res[2*connum + 1]
+        for connum in range(num_tstats):
+            pos_key = contrast_keys[2 * connum]
+            neg_key = contrast_keys[2 * connum + 1]
 
-            dependent_variable_name = os.path.basename(current_directory)
-            independent_variable_name = tnames[cont_ind1][:-3]
+            dependent_variable_name = current_directory.name
+            # remove last three letters which specify Pos/Neg
+            independent_variable_name = contrast_dict[pos_key][:-3]
 
             # Threshold t-stat image
-            tstat_path = "{0}/randomise_tstat{1}.nii.gz".format(current_directory, cont_ind1)
-            p_gt0_path = "{0}/randomise_tfce_corrp_tstat{1}.nii.gz".format(current_directory, cont_ind1)
-            p_lt0_path = "{0}/randomise_tfce_corrp_tstat{1}.nii.gz".format(current_directory, cont_ind2)
+            tstat_path = current_directory / f"randomise_tstat{pos_key}.nii.gz"
+            p_gt0_path = current_directory / f"randomise_tfce_corrp_tstat{pos_key}.nii.gz"
+            p_lt0_path = current_directory / f"randomise_tfce_corrp_tstat{neg_key}.nii.gz"
             thresh_tstat = mask_tstat_img(tstat_path, p_gt0_path, p_lt0_path)
 
             # Only create image if there are significant voxels
-            sig_voxels = np.count_nonzero(thresh_tstat.get_fdata())
+            sig_voxels = np.count_nonzero(thresh_tstat.dataobj)
 
-            if sig_voxels>0:
-              stat_args = {'threshold': 0,
-                 'cut_coords': 10,
-                 'black_bg': True}  
-              plot_stat_map(thresh_tstat, title="{0}:{1} correlated with {2}".format(taskname, dependent_variable_name, independent_variable_name), display_mode='z', **stat_args)  
+            if sig_voxels > 0:
+                stat_args = {'threshold': 0,
+                             'cut_coords': 10,
+                             'black_bg': True}  
+                plot_stat_map(thresh_tstat, 
+                    title=f"{taskname}:{dependent_variable_name} correlated with {independent_variable_name}",
+                        display_mode='z', **stat_args)
             else:
                 print('{0} has no significant correlation with {1}'.format(dependent_variable_name, independent_variable_name))
 
 
 # %%
-task_dirs = glob.glob('/Users/jeanettemumford/sherlock_local/uh2/aim1/BIDS_scans/derivatives/2ndlevel_4_2_21/*/secondlevel-RT-True_beta-False_maps')
+def main():
+    basedir = Path('/Users/poldrack/data_unsynced/uh2/2ndlevel_4_2_21')
+    task_dirs = [i for i in basedir.glob('*/secondlevel-RT-True_beta-False_maps')]
 
-for current_task_dir in task_dirs:
-    task_name = current_task_dir.split('/')[-2]
-    print('-'*20)
-    print(task_name)
-    print('-'*20)
-    search_analysis_make_figures(task_name)
+    for current_task_dir in task_dirs:
+        task_name = current_task_dir.parts[-2]
+        print('-' * 20)
+        print(task_name)
+        print('-' * 20)
+        search_analysis_make_figures(task_name)
 
-# %%
+if __name__ == '__main__':
+    main()
