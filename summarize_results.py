@@ -15,6 +15,7 @@
 #     name: python3
 # ---
 
+# %%
 
 # %%
 # practice with just one design.mat
@@ -34,11 +35,8 @@ def mask_tstat_img(tstat_path, p_gt0_path, p_lt0_path):
     p_gt0_path:  Path to 1-p value image for contrast>0
     p_lt0_path:  Path to 1-p value image for contrast<0
     """
-    p_gt0_img = nib.load(p_gt0_path)
-    p_lt0_img = nib.load(p_lt0_path)
-    tstat_img = nib.load(tstat_path)
     thresh_tstat_img = math_img('((img1 > 0.95) + (img2 > 0.95)) * img3',
-                                img1=p_gt0_img, img2=p_lt0_img, img3=tstat_img)
+                    img1=str(p_gt0_path), img2=str(p_lt0_path), img3=str(tstat_path))
     return thresh_tstat_img
 
 
@@ -46,7 +44,6 @@ def get_json_contents(json_file):
     """
     load contents from the task contrast json
     """
-
     with open(json_file) as f:
         return(json.load(f))
 
@@ -96,27 +93,24 @@ def search_analysis_make_figures(taskdir):
             sig_voxels = np.count_nonzero(thresh_tstat.dataobj)
 
             if sig_voxels > 0:
-                stat_args = {'threshold': 0,
-                             'cut_coords': 10,
-                             'black_bg': True}  
                 plot_stat_map(thresh_tstat, 
                     title=f"{taskname}:{dependent_variable_name} correlated with {independent_variable_name}",
-                        display_mode='z', **stat_args)
+                        display_mode='z', threshold=0, cut_coords=10, black_bg=True)
             else:
                 print('{0} has no significant correlation with {1}'.format(dependent_variable_name, independent_variable_name))
 
 
 # %%
 def main():
-    basedir = Path('/Users/poldrack/data_unsynced/uh2/2ndlevel_4_2_21')
+    basedir = Path('/Users/jeanettemumford/sherlock_local/uh2/aim1/BIDS_scans/derivatives/2ndlevel_4_2_21')
     task_dirs = [i for i in basedir.glob('*/secondlevel-RT-True_beta-False_maps')]
 
     for current_task_dir in task_dirs:
-        task_name = current_task_dir.parts[-2]
+        taskname = current_task_dir.parts[-2]
         print('-' * 20)
-        print(task_name)
+        print(taskname)
         print('-' * 20)
-        search_analysis_make_figures(task_name)
+        search_analysis_make_figures(current_task_dir)
 
 if __name__ == '__main__':
     main()
