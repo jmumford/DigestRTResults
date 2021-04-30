@@ -106,20 +106,17 @@ def search_analysis_make_figures(taskdir):
                 correlation with {independent_variable_name}")
 
 
-# +
-def main():
-    basedir = Path('/Users/jeanettemumford/sherlock_local/uh2/aim1/BIDS_scans/\
-    derivatives/2ndlevel_4_2_21')
-    task_dirs = [i for i in basedir.glob(
-                 '*/secondlevel-RT-True_beta-False_maps')]
+# -
 
-    for current_task_dir in task_dirs:
-        taskname = current_task_dir.parts[-2]
-        print('-' * 20)
-        print(taskname)
-        print('-' * 20)
-        search_analysis_make_figures(current_task_dir)
+basedir = Path('/Users/jeanettemumford/sherlock_local/uh2/aim1/BIDS_scans/\
+derivatives/2ndlevel_4_2_21')
+task_dirs = [i for i in basedir.glob(
+             '*/secondlevel-RT-True_beta-False_maps')]
+for current_task_dir in task_dirs:
+    taskname = current_task_dir.parts[-2]
+    print('-' * 20)
+    print(taskname)
+    print('-' * 20)
+    search_analysis_make_figures(current_task_dir)
 
 
-if __name__ == '__main__':
-    main()
